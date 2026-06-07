@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-import type {IndexData, NoteData, TranslationMap} from "./types";
+import type {IndexData, NoteData, ProcessorContext, TranslationMap} from "./types";
 import {getCurrentData, getCurrentVersionTag} from "./fetch";
 import {retry} from "./retry";
 import {indexConfig, langConfig} from "./config";
@@ -21,16 +21,25 @@ async function main() {
         return;
     }
 
-    // check missing translation.
-    console.log("\n");
-    console.log("=".repeat(4), "Check missing translation");
-    checkTranslation();
+    console.log("Current tag", currentTag);
+    const context: ProcessorContext = {
+        currentTag,
+        dirty: false,
+    };
+
+    await processMissingTranslation(context);
+    await processData(context);
+    await dumpIndex(context);
+}
+
+async function processData(ctx: ProcessorContext) {
+    const {currentTag} = ctx;
 
     if (fs.existsSync(indexPath)) {
         const indexData = (await Bun.file(indexPath).json()) as IndexData;
 
         if (indexData.currentVersionTag == currentTag) {
-            console.log("Wiki have no update. Current version tag:", currentTag);
+            console.log("No change for wiki version tag.");
             return;
         }
     }
@@ -91,6 +100,88 @@ async function main() {
             await Bun.write(path.join(notesPath, lang, fileName), JSON.stringify(noteData));
         }),
     );
+}
+
+async function processMissingTranslation(ctx: ProcessorContext) {
+    // check missing translation files.
+    const missingMap = await getMissingTranslation();
+    if (!missingMap) {
+        console.log("No missing translation found.");
+        return;
+    }
+
+    ctx.dirty = true;
+
+    console.log("\n");
+    console.log("=".repeat(4), "Translating missing");
+    console.log("Missing:", missingMap);
+
+    await Promise.all(
+        Object.entries(missingMap).map(async ([lang, files]) => {
+            console.log("Translating missing files for", lang);
+
+            for (const fileName of files) {
+                const enFile = path.join(notesPath, "en", fileName);
+                const {versionTag, notes: enNotes} = (await Bun.file(enFile).json()) as NoteData;
+
+                const tag = `Translated ${fileName} to ${lang}`;
+                console.time(tag);
+                const result = await retry(() => translate(enNotes, lang));
+                console.timeEnd(tag);
+                if (!result) {
+                    console.error("Failed to translate to", lang);
+                    continue;
+                }
+
+                const noteData: NoteData = {
+                    versionTag,
+                    updateTime: Date.now(),
+                    lang,
+                    notes: result.data,
+                };
+                await Bun.write(path.join(notesPath, lang, fileName), JSON.stringify(noteData));
+            }
+        }),
+    );
+}
+
+async function getMissingTranslation() {
+    const enDir = path.join(notesPath, "en");
+    if (!fs.existsSync(enDir)) {
+        console.log("English notes directory not found.");
+        return null;
+    }
+
+    const enFiles = fs.readdirSync(enDir).filter(f => f.endsWith(".json"));
+
+    const missingMap: Record<string, string[]> = {};
+
+    for (const lang of langConfig.targetLang) {
+        const langDir = path.join(notesPath, lang);
+        const langFiles = fs.existsSync(langDir)
+            ? new Set(fs.readdirSync(langDir).filter(f => f.endsWith(".json")))
+            : new Set<string>();
+
+        const missing = enFiles.filter(f => !langFiles.has(f));
+        if (missing.length) {
+            missingMap[lang] = missing;
+        }
+    }
+
+    if (Object.keys(missingMap).length === 0) {
+        return null;
+    }
+
+    return missingMap;
+}
+
+async function dumpIndex(ctx: ProcessorContext) {
+    const {currentTag, dirty} = ctx;
+
+    if (!dirty) {
+        console.log("No change for index.json.");
+        return;
+    }
 
     console.log("\n");
     console.log("=".repeat(4), "Dump index.json");
@@ -135,5 +226,3 @@ async function main() {
     await Bun.write(indexPath, JSON.stringify(newIndexData));
     console.timeEnd(dumpNotesTag);
 }
-
-function checkTranslation() {}

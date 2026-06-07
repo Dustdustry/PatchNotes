@@ -51,3 +51,8 @@ export type IndexData = {
 export type NoteFields = Record<string, Record<string, string>>;
 
 export type TranslationMap = Record<string, NoteFields>;
+
+export type ProcessorContext = {
+    currentTag: string;
+    dirty: boolean;
+};
