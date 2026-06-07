@@ -1,0 +1,22 @@
+{
+    "name": "patch-notes",
+    "module": "index.ts",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "start": "bun run src/index.ts"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "@types/jsdom": "^27.0.0"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    },
+    "dependencies": {
+        "jsdom": "^28.1.0",
+        "openai": "^6.22.0",
+        "p-limit": "^7.3.0",
+        "zod": "^4.3.6"
+    }
+}
