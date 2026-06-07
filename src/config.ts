@@ -3,7 +3,7 @@ export const fetchConfig = {
     asyncLimit: 3,
     delayTime: 1000,
     estimateTimeMs: 500,
-    testAmount: 30,
+    testAmount: -1,
     onlyTypes: [] as string[],
 };
 
