@@ -14,15 +14,12 @@ export async function retry<T>(fn: () => T | Promise<T>, options: RetryOptions =
         try {
             return await fn();
         } catch (error) {
-            if (options.onError) {
-                options.onError?.(error);
-            } else {
-                lastError = error;
-            }
+            lastError = error;
+            options.onError?.(error);
             if (attempt >= retryTimes) break;
             if (interval) await sleep(interval);
         }
     }
 
-    if (lastError) throw lastError;
+    throw lastError;
 }
