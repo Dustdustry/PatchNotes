@@ -52,6 +52,8 @@ async function processData(ctx: ProcessorContext) {
         return;
     }
 
+    ctx.dirty = true;
+
     console.log("\n");
     console.log("=".repeat(4), "Translating");
 
@@ -69,9 +71,9 @@ async function processData(ctx: ProcessorContext) {
         limit(async () => {
             const tag = `Translated to ${lang}`;
             console.time(tag);
-            const result = await retry(() => translate(currentData, lang));
+            const result = await translate(currentData, lang);
             console.timeEnd(tag);
-            if (!result) {
+            if (!result.data) {
                 console.error("Failed to translate to", lang);
                 return null;
             }
@@ -126,9 +128,9 @@ async function processMissingTranslation(ctx: ProcessorContext) {
 
                 const tag = `Translated ${fileName} to ${lang}`;
                 console.time(tag);
-                const result = await retry(() => translate(enNotes, lang));
+                const result = await translate(enNotes, lang);
                 console.timeEnd(tag);
-                if (!result) {
+                if (!result.data) {
                     console.error("Failed to translate to", lang);
                     continue;
                 }

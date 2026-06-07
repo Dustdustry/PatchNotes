@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type {NoteFields} from "./types";
 import type {CompletionUsage} from "openai/resources";
 import pLimit from "p-limit";
+import {retry} from "./retry";
 
 // Very simple way to translate the notes.
 const systemPrompt = `
@@ -36,12 +37,17 @@ export async function translate(notes: NoteFields, targetLang: string) {
     let counter = 0,
         splitIndex = 0;
     Object.entries(notes).forEach(([type, fields]) => {
-        if (!splitNotesArray[splitIndex]) splitNotesArray[splitIndex] = {};
+        const notesCount = Object.keys(fields).length;
+        if (counter > 50 && notesCount > 50) {
+            splitIndex++;
+            counter = 0;
+        }
 
+        if (!splitNotesArray[splitIndex]) splitNotesArray[splitIndex] = {};
         const splitData = splitNotesArray[splitIndex]!;
         splitData[type] = fields;
+        counter += notesCount;
 
-        counter += Object.keys(fields).length;
         if (counter > 100) {
             splitIndex++;
             counter = 0;
@@ -59,52 +65,58 @@ export async function translate(notes: NoteFields, targetLang: string) {
     const limit = pLimit(4);
     const translateJobs = splitNotesArray.map(splitNotes =>
         limit(async () => {
-            const tag = `Translated types: ${Object.keys(splitNotes)}`;
+            const types = Object.keys(splitNotes);
+            const tag = `Translated types: ${types}`;
 
             console.time(tag);
-            const completion = await openai.chat.completions.create({
-                messages: [
-                    {role: "system", content: systemPrompt},
-                    {
-                        role: "user",
-                        content: `目标语言：${targetLang},json数据: ${JSON.stringify(splitNotes)})`,
-                    },
-                ],
-                model: "deepseek-v4-flash",
-                response_format: {
-                    type: "json_object",
+            const data = await retry(async () => requestTranslation(splitNotes), {
+                retryTimes: 3,
+                interval: 1500,
+                onError(e) {
+                    console.error("Failed to translate types:", types);
                 },
             });
-            console.timeEnd(tag);
-
-            const {prompt_tokens = 0, completion_tokens = 0, total_tokens = 0} = completion.usage ?? {};
-            usage.prompt_tokens += prompt_tokens;
-            usage.completion_tokens += completion_tokens;
-            usage.total_tokens += total_tokens;
-
-            // logs.push(`
-            //         ${new Date().toLocaleString()}
-            //         Cost: ${JSON.stringify(completion.usage, null, 4)}
-            //         Content: ${completion.choices[0]!.message.content!}
-            //     `);
-
-            let data: NoteFields;
-            try {
-                data = JSON.parse(completion.choices[0]!.message.content!);
-            } catch (e) {
-                console.error(`Failed to parse LLM response:`, e);
-                return;
-            }
 
             Object.assign(translatedNotes, data);
+
+            console.timeEnd(tag);
         }),
     );
 
     await Promise.all(translateJobs);
 
     return {
-        data: translatedNotes,
+        data: Object.keys(translatedNotes).length ? translatedNotes : null,
         logs,
         usage,
     };
+
+    async function requestTranslation(requestNotes: NoteFields) {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {role: "system", content: systemPrompt},
+                {
+                    role: "user",
+                    content: `目标语言：${targetLang},json数据: ${JSON.stringify(requestNotes)})`,
+                },
+            ],
+            model: "deepseek-v4-flash",
+            response_format: {
+                type: "json_object",
+            },
+        });
+
+        const {prompt_tokens = 0, completion_tokens = 0, total_tokens = 0} = completion.usage ?? {};
+        usage.prompt_tokens += prompt_tokens;
+        usage.completion_tokens += completion_tokens;
+        usage.total_tokens += total_tokens;
+
+        // logs.push(`
+        //         ${new Date().toLocaleString()}
+        //         Cost: ${JSON.stringify(completion.usage, null, 4)}
+        //         Content: ${completion.choices[0]!.message.content!}
+        //     `);
+
+        return JSON.parse(completion.choices[0]!.message.content!) as NoteFields;
+    }
 }
