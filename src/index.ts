@@ -9,13 +9,14 @@ import pLimit from "p-limit";
 import {translate} from "./translate";
 import type {CompletionUsage} from "openai/resources";
 
-const notesPath = path.resolve(process.cwd(), indexConfig.outPath);
+const rootPath = process.cwd();
+const notesPath = path.resolve(rootPath, indexConfig.outPath);
 const indexPath = path.resolve(notesPath, indexConfig.indexFile);
 
 await main();
 
 async function main() {
-    const currentTag = await retry(getCurrentVersionTag);
+    const currentTag = "157.4"; // await retry(getCurrentVersionTag);
     if (!currentTag) {
         console.error("Failed to get version tag");
         return;
@@ -24,11 +25,11 @@ async function main() {
     console.log("Current tag", currentTag);
     const context: ProcessorContext = {
         currentTag,
-        dirty: false,
+        dirty: true,
     };
 
-    await processMissingTranslation(context);
-    await processData(context);
+    // await processMissingTranslation(context);
+    // await processData(context);
     await dumpIndex(context);
 }
 
@@ -221,10 +222,26 @@ async function dumpIndex(ctx: ProcessorContext) {
 
                 noteCount,
                 fileName: file.name,
+                fileUrl: toRawFileUrl(filePath, rootPath, indexConfig.repoRawBaseUrl),
             };
         }),
     );
 
     await Bun.write(indexPath, JSON.stringify(newIndexData));
     console.timeEnd(dumpNotesTag);
+}
+
+function toRawFileUrl(filePath: string, rootPath: string, baseUrl: URL): string {
+    let rel = path.relative(rootPath, filePath);
+
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+        throw new Error(`File ${filePath} is outside repository root ${rootPath}`);
+    }
+
+    const posixRel = rel.split(path.sep).join("/");
+
+    const encoded = posixRel.split("/").map(encodeURIComponent).join("/");
+
+    const baseStr = baseUrl.href.replace(/\/$/, "");
+    return `${baseStr}/${encoded}`;
 }

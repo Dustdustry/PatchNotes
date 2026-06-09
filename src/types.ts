@@ -41,6 +41,7 @@ export type NoteDataIndexed = NoteDataMeta & {
     lang: string | string[];
     noteCount: number;
     fileName: string;
+    fileUrl: string;
 };
 
 export type IndexData = {

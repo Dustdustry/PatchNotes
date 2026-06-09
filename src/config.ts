@@ -7,9 +7,14 @@ export const fetchConfig = {
     onlyTypes: [] as string[],
 };
 
+export const rawBaseUrl = "https://raw.githubusercontent.com";
+export const githubRepo = "Dustdustry/PatchNotes";
+export const repoBranch = "main";
+
 export const indexConfig = {
     outPath: "notes",
     indexFile: "index.json",
+    repoRawBaseUrl: new URL(`${rawBaseUrl}/${githubRepo}/${repoBranch}`),
 };
 
 export const langConfig = {
