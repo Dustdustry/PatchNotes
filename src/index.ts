@@ -25,11 +25,11 @@ async function main() {
     console.log("Current tag", currentTag);
     const context: ProcessorContext = {
         currentTag,
-        dirty: true,
+        dirty: false,
     };
 
-    // await processMissingTranslation(context);
-    // await processData(context);
+    await processMissingTranslation(context);
+    await processData(context);
     await dumpIndex(context);
 }
 
