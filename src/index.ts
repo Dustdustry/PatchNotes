@@ -3,11 +3,11 @@ import path from "path";
 
 import type {IndexData, NoteData, ProcessorContext, TranslationMap} from "./types";
 import {getCurrentData, getCurrentVersionTag} from "./fetch";
-import {retry} from "./retry";
 import {indexConfig, langConfig} from "./config";
 import pLimit from "p-limit";
 import {translate} from "./translate";
 import type {CompletionUsage} from "openai/resources";
+import {retry} from "./retry";
 
 const rootPath = process.cwd();
 const notesPath = path.resolve(rootPath, indexConfig.outPath);
@@ -16,7 +16,7 @@ const indexPath = path.resolve(notesPath, indexConfig.indexFile);
 await main();
 
 async function main() {
-    const currentTag = "157.4"; // await retry(getCurrentVersionTag);
+    const currentTag = await retry(getCurrentVersionTag);
     if (!currentTag) {
         console.error("Failed to get version tag");
         return;
