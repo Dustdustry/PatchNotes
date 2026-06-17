@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
 
-import type {IndexData, NoteData, ProcessorContext, TranslationMap} from "./types";
+import type {ContributionNotesData, IndexData, NoteData, NoteFields, ProcessorContext, TranslationMap} from "./types";
 import {getCurrentData, getCurrentVersionTag} from "./fetch";
-import {indexConfig, langConfig} from "./config";
+import {contributionConfig, indexConfig, langConfig} from "./config";
 import pLimit from "p-limit";
 import {translate} from "./translate";
 import type {CompletionUsage} from "openai/resources";
@@ -12,6 +12,7 @@ import {retry} from "./retry";
 const rootPath = process.cwd();
 const notesPath = path.resolve(rootPath, indexConfig.outPath);
 const indexPath = path.resolve(notesPath, indexConfig.indexFile);
+const contributionPath = path.resolve(rootPath, contributionConfig.path);
 
 await main();
 
@@ -56,6 +57,52 @@ async function processData(ctx: ProcessorContext) {
     ctx.dirty = true;
 
     console.log("\n");
+    console.log("=".repeat(4), "Merge Contribution Notes");
+
+    const contributors = [] as string[];
+    const mergedNotes = new Map<string, string>();
+    const contributionNotes = await getContributionNotes();
+    contributionNotes.forEach((data, index) => {
+        if (data.status === "rejected") {
+            console.log(data.reason);
+            return;
+        }
+
+        if (index != 0) console.log("\n");
+        console.log(">", `Merging ${data.value.name} by ${data.value.contributors}`);
+
+        const {value} = data;
+        let mergeCount = 0,
+            conflictCount = 0;
+        Object.entries(value.notes).forEach(([type, typeNotes]) => {
+            Object.entries(typeNotes).forEach(([fieldName, fieldNote]) => {
+                const fieldKey = type + "." + fieldName;
+                const other = mergedNotes.get(fieldKey);
+                if (other) {
+                    conflictCount++;
+                    const otherNote = currentData[type]![fieldName]!;
+                    console.log(`${conflictCount}. Conflicted: '${fieldKey}'`);
+                    console.log(`[√] ${other}: ${otherNote}`);
+                    console.log(`[x] ${value.name}: ${fieldNote}`);
+                } else {
+                    mergedNotes.set(fieldKey, value.name);
+                    const typeData = currentData[type] ?? (currentData[type] = {});
+                    typeData[fieldName] = fieldNote;
+                    mergeCount++;
+                }
+            });
+        });
+
+        if (mergeCount == 0) {
+            console.log(`No fields available.`);
+            return;
+        }
+
+        contributors.push(...value.contributors);
+        console.log(`Merged ${mergeCount} notes.`);
+    });
+
+    console.log("\n");
     console.log("=".repeat(4), "Translating");
 
     const translationMap: TranslationMap = {};
@@ -98,6 +145,7 @@ async function processData(ctx: ProcessorContext) {
                 versionTag: currentTag,
                 updateTime: Date.now(),
                 lang,
+                contributors,
                 notes,
             } satisfies NoteData;
             await Bun.write(path.join(notesPath, lang, fileName), JSON.stringify(noteData));
@@ -125,7 +173,7 @@ async function processMissingTranslation(ctx: ProcessorContext) {
 
             for (const fileName of files) {
                 const enFile = path.join(notesPath, "en", fileName);
-                const {versionTag, notes: enNotes} = (await Bun.file(enFile).json()) as NoteData;
+                const {versionTag, notes: enNotes, contributors} = (await Bun.file(enFile).json()) as NoteData;
 
                 const tag = `Translated ${fileName} to ${lang}`;
                 console.time(tag);
@@ -140,9 +188,27 @@ async function processMissingTranslation(ctx: ProcessorContext) {
                     versionTag,
                     updateTime: Date.now(),
                     lang,
+                    contributors,
                     notes: result.data,
                 };
                 await Bun.write(path.join(notesPath, lang, fileName), JSON.stringify(noteData));
+            }
+        }),
+    );
+}
+
+async function getContributionNotes() {
+    const files = fs
+        .readdirSync(contributionPath, {withFileTypes: true, recursive: true})
+        .filter(d => d.isFile() && d.name.endsWith(".json"));
+
+    return await Promise.allSettled(
+        files.map(async f => {
+            const filePath = path.join(f.parentPath, f.name);
+            try {
+                return (await Bun.file(filePath).json()) as ContributionNotesData;
+            } catch (e) {
+                throw new Error(`Failed to read contribution file: ${filePath}`);
             }
         }),
     );
@@ -211,16 +277,15 @@ async function dumpIndex(ctx: ProcessorContext) {
     await Promise.all(
         noteFiles.map(async (file, index) => {
             const filePath = path.join(file.parentPath, file.name);
-            const {versionTag, updateTime, lang, notes} = (await Bun.file(filePath).json()) as NoteData;
-
-            const noteCount = Object.values(notes).reduce((counter, fields) => counter + Object.keys(fields).length, 0);
+            const {versionTag, updateTime, lang, notes, contributors} = (await Bun.file(filePath).json()) as NoteData;
 
             newIndexData.notes[index] = {
                 versionTag,
                 updateTime,
                 lang,
+                contributors,
 
-                noteCount,
+                noteCount: countNotes(notes),
                 fileName: file.name,
                 fileUrl: toRawFileUrl(filePath, rootPath, indexConfig.repoRawBaseUrl),
             };
@@ -244,4 +309,8 @@ function toRawFileUrl(filePath: string, rootPath: string, baseUrl: URL): string 
 
     const baseStr = baseUrl.href.replace(/\/$/, "");
     return `${baseStr}/${encoded}`;
+}
+
+function countNotes(notes: NoteFields) {
+    return Object.values(notes).reduce((count, cur) => count + Object.keys(cur).length, 0);
 }

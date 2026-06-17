@@ -30,7 +30,7 @@ export type NoteDataMeta = {
     versionTag: string | "unknown";
     updateTime: number;
     lang: string;
-    // contributors: string[];
+    contributors: string[];
 };
 
 export type NoteData = NoteDataMeta & {
@@ -38,7 +38,7 @@ export type NoteData = NoteDataMeta & {
 };
 
 export type NoteDataIndexed = NoteDataMeta & {
-    lang: string | string[];
+    lang: string;
     noteCount: number;
     fileName: string;
     fileUrl: string;
@@ -47,6 +47,11 @@ export type NoteDataIndexed = NoteDataMeta & {
 export type IndexData = {
     currentVersionTag: string;
     notes: NoteDataIndexed[];
+};
+
+export type ContributionNotesData = Pick<NoteData, "versionTag" | "notes"> & {
+    name: string;
+    contributors: string[];
 };
 
 export type NoteFields = Record<string, Record<string, string>>;

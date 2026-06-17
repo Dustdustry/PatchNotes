@@ -15,6 +15,11 @@ export const indexConfig = {
     outPath: "notes",
     indexFile: "index.json",
     repoRawBaseUrl: new URL(`${rawBaseUrl}/${githubRepo}/${repoBranch}`),
+    contributors: [],
+};
+
+export const contributionConfig = {
+    path: "contributions",
 };
 
 export const langConfig = {
