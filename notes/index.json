@@ -1,1 +1,27 @@
-{"currentVersionTag":"157.4","contributors":[],"notes":[{"versionTag":"157.4","updateTime":1780847038297,"lang":"en","noteCount":967,"fileName":"notes-157.4.json","fileUrl":"https://raw.githubusercontent.com/Dustdustry/PatchNotes/main/notes/en/notes-157.4.json"},{"versionTag":"157.4","updateTime":1780847038298,"lang":"zh_CN","noteCount":967,"fileName":"notes-157.4.json","fileUrl":"https://raw.githubusercontent.com/Dustdustry/PatchNotes/main/notes/zh_CN/notes-157.4.json"}]}
+{
+    "currentVersionTag": "157.4",
+    "notes": [
+        {
+            "versionTag": "157.4",
+            "updateTime": 1781693280120,
+            "lang": "en",
+            "contributors": [
+                "AAA哪位呀"
+            ],
+            "noteCount": 1300,
+            "fileName": "notes-157.4.json",
+            "fileUrl": "https://raw.githubusercontent.com/Dustdustry/PatchNotes/main/notes/en/notes-157.4.json"
+        },
+        {
+            "versionTag": "157.4",
+            "updateTime": 1781693280120,
+            "lang": "zh_CN",
+            "contributors": [
+                "AAA哪位呀"
+            ],
+            "noteCount": 1300,
+            "fileName": "notes-157.4.json",
+            "fileUrl": "https://raw.githubusercontent.com/Dustdustry/PatchNotes/main/notes/zh_CN/notes-157.4.json"
+        }
+    ]
+}
