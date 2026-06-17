@@ -70,7 +70,7 @@ export async function translate(notes: NoteFields, targetLang: string) {
 
             console.time(tag);
             const data = await retry(async () => requestTranslation(splitNotes), {
-                retryTimes: 3,
+                retryTimes: 5,
                 interval: 1500,
                 onError(e) {
                     console.error("Failed to translate types:", types);

@@ -292,7 +292,8 @@ async function dumpIndex(ctx: ProcessorContext) {
         }),
     );
 
-    await Bun.write(indexPath, JSON.stringify(newIndexData));
+    // Format the index.json for possible difference checks.
+    await Bun.write(indexPath, JSON.stringify(newIndexData, null, 4));
     console.timeEnd(dumpNotesTag);
 }
 
